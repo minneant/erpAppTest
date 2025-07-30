@@ -1,17 +1,24 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./styles.css";
+import InputModal from "./components/InputModal";
 
 const WEB_APP_URL =
-  "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // 실제 URL로 교체
+  "https://script.google.com/macros/s/AKfycby6-qghTbPve04vvpRQMTzeHt59NL4_bsOlGMEiKPvvTVQGkv-RLBXBiIt7Ghq4hNZm/exec";
 
 function App() {
   const [productionData, setProductionData] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [modalMode, setModalMode] = useState("Record");
+  const [inputRows, setInputRows] = useState([
+    { date: new Date(), process: "", type: "", line: "", inch: "", amount: "" },
+  ]);
+  const [dropdownOptions, setDropdownOptions] = useState({ Process: [], Type: [], Line: [] });
 
   useEffect(() => {
     fetchProductionData();
+    fetchDropdownOptions();
   }, []);
 
   const fetchProductionData = async () => {
@@ -23,10 +30,24 @@ function App() {
     }
   };
 
-  const categorizeData = (data) => {
-    const isFoamingOrWire = (proc) =>
-      proc === "Foaming" || proc === "Wire";
+  const fetchDropdownOptions = async () => {
+    try {
+      const res = await axios.get(`${WEB_APP_URL}?action=getMeta`);
+      const rows = res.data;
+      const grouped = { Process: [], Type: [], Line: [] };
+      rows.forEach((row) => {
+        if (grouped[row.category] && !grouped[row.category].includes(row.name)) {
+          grouped[row.category].push(row.name);
+        }
+      });
+      setDropdownOptions(grouped);
+    } catch (error) {
+      console.error("드랍다운 데이터 불러오기 실패:", error);
+    }
+  };
 
+  const categorizeData = (data) => {
+    const isFoamingOrWire = (proc) => proc === "Foaming" || proc === "Wire";
     const groupByItem = (items) => {
       const result = {};
       for (const row of items) {
@@ -35,14 +56,8 @@ function App() {
       }
       return result;
     };
-
-    const leftData = groupByItem(
-      data.filter((row) => isFoamingOrWire(row.Process))
-    );
-    const rightData = groupByItem(
-      data.filter((row) => !isFoamingOrWire(row.Process))
-    );
-
+    const leftData = groupByItem(data.filter((row) => isFoamingOrWire(row.Process)));
+    const rightData = groupByItem(data.filter((row) => !isFoamingOrWire(row.Process)));
     return { leftData, rightData };
   };
 
@@ -59,7 +74,6 @@ function App() {
   );
 
   const formatDate = (date) => date.toISOString().slice(0, 10);
-
   const changeDateBy = (days) => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
@@ -68,7 +82,6 @@ function App() {
 
   return (
     <div className="app-layout">
-      {/* 날짜 선택 UI */}
       <div className="date-header">
         <button onClick={() => changeDateBy(-1)}>&lt;</button>
         <input
@@ -90,20 +103,17 @@ function App() {
         </div>
       </div>
 
-      {/* ➕ 버튼 */}
-      <button className="add-btn" onClick={() => setShowModal(true)}>
-        ＋
-      </button>
+      <button className="add-btn" onClick={() => setShowModal(true)}>＋</button>
 
-      {/* 모달 (기본 구조) */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>생산 실적 추가</h3>
-            <p>여기에 폼이 들어갈 예정</p>
-            <button onClick={() => setShowModal(false)}>닫기</button>
-          </div>
-        </div>
+        <InputModal
+          modalMode={modalMode}
+          setModalMode={setModalMode}
+          inputRows={inputRows}
+          setInputRows={setInputRows}
+          dropdownOptions={dropdownOptions}
+          setShowModal={setShowModal}
+        />
       )}
     </div>
   );
