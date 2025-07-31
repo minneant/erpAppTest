@@ -1,8 +1,9 @@
-// ✅ App.js with request vs actual color logic (fixed categorizeData order)
+// ✅ App.js with item naming rule popup support
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./styles.css";
 import InputModal from "./components/InputModal";
+import namingRuleImg from "./assets/itemnamingrule.png";
 
 const WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycby6-qghTbPve04vvpRQMTzeHt59NL4_bsOlGMEiKPvvTVQGkv-RLBXBiIt7Ghq4hNZm/exec";
@@ -11,6 +12,7 @@ function App() {
   const [productionData, setProductionData] = useState([]);
   const [requestData, setRequestData] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showNamingRule, setShowNamingRule] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [modalMode, setModalMode] = useState("Record");
   const [inputRows, setInputRows] = useState([
@@ -102,6 +104,12 @@ function App() {
     setSelectedDate(newDate);
   };
 
+  const formatRemainderText = (actual, requested) => {
+    const diff = actual - requested;
+    if (diff >= 0) return `(Excess: ${diff})`;
+    return `(Remainder: ${-diff})`;
+  };
+
   return (
     <div className="app-layout">
       <div className="date-header center">
@@ -112,7 +120,17 @@ function App() {
           onChange={(e) => setSelectedDate(new Date(e.target.value))}
         />
         <button onClick={() => changeDateBy(1)}>&gt;</button>
+        <button className="info-btn" onClick={() => setShowNamingRule(true)}>?</button>
       </div>
+
+      {showNamingRule && (
+        <div className="modal-overlay" onClick={() => setShowNamingRule(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <img src={namingRuleImg} alt="Item Naming Rule" className="naming-img" />
+            <button className="close-btn" onClick={() => setShowNamingRule(false)}>Close</button>
+          </div>
+        </div>
+      )}
 
       <div className="content-row">
         <div className="column">
@@ -124,7 +142,7 @@ function App() {
                   key={`request-${item}`}
                   className={leftData[item] >= count ? "text-lime" : "text-tomato"}
                 >
-                  <strong>{item}</strong>: {count}
+                  <strong>{item}</strong>: {count} {formatRemainderText(leftData[item] || 0, count)}
                 </li>
               )
             ))}
@@ -148,7 +166,7 @@ function App() {
                   key={`request-${item}`}
                   className={rightData[item] >= count ? "text-lime" : "text-tomato"}
                 >
-                  <strong>{item}</strong>: {count}
+                  <strong>{item}</strong>: {count} {formatRemainderText(rightData[item] || 0, count)}
                 </li>
               )
             ))}
