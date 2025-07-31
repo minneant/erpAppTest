@@ -1,4 +1,3 @@
-// ✅ App.js with item naming rule popup support
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./styles.css";
@@ -31,7 +30,7 @@ function App() {
       const res = await axios.get(`${WEB_APP_URL}?action=getProductionHistory`);
       setProductionData(res.data);
     } catch (error) {
-      console.error("Failed to load data:", error);
+      console.error("Failed to load production data:", error);
     }
   };
 
@@ -51,7 +50,7 @@ function App() {
       const grouped = { Process: [], Type: [], Line: [] };
       rows.forEach((row) => {
         if (grouped[row.category] && !grouped[row.category].some(r => r.name === row.name)) {
-          grouped[row.category].push({ name: row.name, alias: row.alias });
+          grouped[row.category].push({ name: row.name, alias: row.alias, group: row.group });
         }
       });
       setDropdownOptions(grouped);
@@ -60,31 +59,11 @@ function App() {
     }
   };
 
-  const categorizeData = (data) => {
-    const isFoamingOrWire = (proc) => proc === "Foaming" || proc === "Wire";
-    const groupByItem = (items) => {
-      const result = {};
-      for (const row of items) {
-        const key = row.Item;
-        result[key] = (result[key] || 0) + parseInt(row.Amount);
-      }
-      return result;
-    };
-    const leftData = groupByItem(data.filter((row) => isFoamingOrWire(row.Process)));
-    const rightData = groupByItem(data.filter((row) => !isFoamingOrWire(row.Process)));
-    return { leftData, rightData };
-  };
-
   const formatDate = (d) => new Date(d).toLocaleDateString("sv-SE");
   const selectedDateStr = formatDate(selectedDate);
 
-  const filteredData = productionData.filter(
-    (row) => formatDate(row.Date) === selectedDateStr
-  );
-
-  const filteredRequests = requestData.filter(
-    (row) => formatDate(row.Date) === selectedDateStr
-  );
+  const filteredData = productionData.filter(row => formatDate(row.Date) === selectedDateStr);
+  const filteredRequests = requestData.filter(row => formatDate(row.Date) === selectedDateStr);
 
   const groupByItem = (items) => {
     const result = {};
@@ -95,8 +74,27 @@ function App() {
     return result;
   };
 
-  const { leftData, rightData } = categorizeData(filteredData);
+  const actualDataByItem = groupByItem(filteredData);
   const requestDataByItem = groupByItem(filteredRequests);
+
+  // processGroups: { "Foaming": "Left", "Foam": "Left", ... }
+  const processGroups = dropdownOptions.Process.reduce((map, p) => {
+    map[p.name] = p.group;
+    map[p.alias] = p.group;
+    return map;
+  }, {});
+
+  const leftData = {}, rightData = {};
+
+  for (const [item, amount] of Object.entries(actualDataByItem)) {
+    const process = item.split("_").slice(-1)[0]; // ex: Foam
+    const group = processGroups[process] || "Right";
+    if (group === "Left") {
+      leftData[item] = amount;
+    } else {
+      rightData[item] = amount;
+    }
+  }
 
   const changeDateBy = (days) => {
     const newDate = new Date(selectedDate);
@@ -109,6 +107,31 @@ function App() {
     if (diff >= 0) return `(Excess: ${diff})`;
     return `(Remainder: ${-diff})`;
   };
+
+  const renderRequestList = (dataByItem, groupLabel) => {
+    return Object.entries(requestDataByItem).map(([item, count]) => {
+      const process = item.split("_").slice(-1)[0];
+      const group = processGroups[process] || "Right";
+      if (group !== groupLabel) return null;
+      const actual = actualDataByItem[item] || 0;
+      return (
+        <li
+          key={`request-${item}`}
+          className={actual >= count ? "text-lime" : "text-tomato"}
+        >
+          <strong>{item}</strong>: {count} {formatRemainderText(actual, count)}
+        </li>
+      );
+    });
+  };
+
+  const renderActualList = (data) => (
+    Object.entries(data).map(([item, count]) => (
+      <li key={`actual-${item}`}>
+        <strong>{item}</strong>: {count}
+      </li>
+    ))
+  );
 
   return (
     <div className="app-layout">
@@ -135,50 +158,15 @@ function App() {
       <div className="content-row">
         <div className="column">
           <h2>Foaming / Wire</h2>
-          <ul>
-            {Object.entries(requestDataByItem).map(([item, count]) => (
-              (item.includes("Foam") || item.includes("Wire")) && (
-                <li
-                  key={`request-${item}`}
-                  className={leftData[item] >= count ? "text-lime" : "text-tomato"}
-                >
-                  <strong>{item}</strong>: {count} {formatRemainderText(leftData[item] || 0, count)}
-                </li>
-              )
-            ))}
-          </ul>
+          <ul>{renderRequestList(requestDataByItem, "Left")}</ul>
           <hr style={{ border: "none", borderTop: "1px solid #ccc", margin: "6px 0" }} />
-          <ul>
-            {Object.entries(leftData).map(([item, count]) => (
-              <li key={item}>
-                <strong>{item}</strong>: {count}
-              </li>
-            ))}
-          </ul>
+          <ul>{renderActualList(leftData)}</ul>
         </div>
-
         <div className="column">
           <h2>Finishing / Elbow</h2>
-          <ul>
-            {Object.entries(requestDataByItem).map(([item, count]) => (
-              (item.includes("Finish") || item.includes("Elbow")) && (
-                <li
-                  key={`request-${item}`}
-                  className={rightData[item] >= count ? "text-lime" : "text-tomato"}
-                >
-                  <strong>{item}</strong>: {count} {formatRemainderText(rightData[item] || 0, count)}
-                </li>
-              )
-            ))}
-          </ul>
+          <ul>{renderRequestList(requestDataByItem, "Right")}</ul>
           <hr style={{ border: "none", borderTop: "1px solid #ccc", margin: "6px 0" }} />
-          <ul>
-            {Object.entries(rightData).map(([item, count]) => (
-              <li key={item}>
-                <strong>{item}</strong>: {count}
-              </li>
-            ))}
-          </ul>
+          <ul>{renderActualList(rightData)}</ul>
         </div>
       </div>
 
