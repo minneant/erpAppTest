@@ -12,7 +12,7 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [modalMode, setModalMode] = useState("Record");
   const [inputRows, setInputRows] = useState([
-    { date: new Date(), process: "", type: "", line: "", inch: "", amount: "" },
+    { process: "", type: "", line: "", inch: "", amount: "" },
   ]);
   const [dropdownOptions, setDropdownOptions] = useState({ Process: [], Type: [], Line: [] });
 
@@ -26,7 +26,7 @@ function App() {
       const res = await axios.get(`${WEB_APP_URL}?action=getProductionHistory`);
       setProductionData(res.data);
     } catch (error) {
-      console.error("데이터 불러오기 실패:", error);
+      console.error("Failed to load data:", error);
     }
   };
 
@@ -34,15 +34,17 @@ function App() {
     try {
       const res = await axios.get(`${WEB_APP_URL}?action=getMeta`);
       const rows = res.data;
+
+      // 구조: { Process: [{name, alias}], Type: [...], Line: [...] }
       const grouped = { Process: [], Type: [], Line: [] };
       rows.forEach((row) => {
-        if (grouped[row.category] && !grouped[row.category].includes(row.name)) {
-          grouped[row.category].push(row.name);
+        if (grouped[row.category] && !grouped[row.category].some(r => r.name === row.name)) {
+          grouped[row.category].push({ name: row.name, alias: row.alias });
         }
       });
       setDropdownOptions(grouped);
     } catch (error) {
-      console.error("드랍다운 데이터 불러오기 실패:", error);
+      console.error("Failed to load dropdowns:", error);
     }
   };
 
@@ -63,16 +65,6 @@ function App() {
 
   const { leftData, rightData } = categorizeData(productionData);
 
-  const renderItemList = (data) => (
-    <ul>
-      {Object.entries(data).map(([item, count]) => (
-        <li key={item}>
-          <strong>{item}</strong>: {count}개
-        </li>
-      ))}
-    </ul>
-  );
-
   const formatDate = (date) => date.toISOString().slice(0, 10);
   const changeDateBy = (days) => {
     const newDate = new Date(selectedDate);
@@ -82,7 +74,7 @@ function App() {
 
   return (
     <div className="app-layout">
-      <div className="date-header">
+      <div className="date-header center">
         <button onClick={() => changeDateBy(-1)}>&lt;</button>
         <input
           type="date"
@@ -95,11 +87,23 @@ function App() {
       <div className="content-row">
         <div className="column">
           <h2>Foaming / Wire</h2>
-          {renderItemList(leftData)}
+          <ul>
+            {Object.entries(leftData).map(([item, count]) => (
+              <li key={item}>
+                <strong>{item}</strong>: {count}
+              </li>
+            ))}
+          </ul>
         </div>
         <div className="column">
           <h2>Finishing</h2>
-          {renderItemList(rightData)}
+          <ul>
+            {Object.entries(rightData).map(([item, count]) => (
+              <li key={item}>
+                <strong>{item}</strong>: {count}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
@@ -113,6 +117,8 @@ function App() {
           setInputRows={setInputRows}
           dropdownOptions={dropdownOptions}
           setShowModal={setShowModal}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
         />
       )}
     </div>
