@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import "./InputModal.css";
 
 function InputModal({
@@ -10,7 +10,10 @@ function InputModal({
   setModalMode,
   selectedDate,
   setSelectedDate,
+  onSaveSuccess, // ✅ App.js에서 전달
 }) {
+  const [isSaving, setIsSaving] = useState(false); // ✅ 저장 중 상태
+
   const handleChange = (index, field, value) => {
     const updated = [...inputRows];
     updated[index][field] = value;
@@ -29,7 +32,6 @@ function InputModal({
     setInputRows(updated);
   };
 
-  // 🔑 alias 추출 함수
   const getAlias = (category, value) => {
     const match = dropdownOptions[category]?.find((opt) => opt.name === value);
     return match ? match.alias : value;
@@ -37,6 +39,7 @@ function InputModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSaving(true); // ✅ 저장 시작
 
     for (const row of inputRows) {
       const item = `${getAlias("Type", row.type)}_${getAlias("Line", row.line)}_${row.inch}_${getAlias("Process", row.process)}`;
@@ -49,7 +52,7 @@ function InputModal({
         inch: row.inch,
         amount: row.amount,
         item: item,
-        mode: modalMode, // Record or Request
+        mode: modalMode,
       };
 
       const formBody = `data=${encodeURIComponent(JSON.stringify(payload))}`;
@@ -71,12 +74,15 @@ function InputModal({
       } catch (err) {
         console.error("Save failed:", err);
         alert("Save failed");
+        setIsSaving(false);
         return;
       }
     }
 
+    setIsSaving(false);
     alert("Saved successfully.");
     setShowModal(false);
+    onSaveSuccess(); // ✅ App.js에서 데이터 새로고침 호출
   };
 
   return (
@@ -164,7 +170,9 @@ function InputModal({
 
           <div className="modal-buttons">
             <button type="button" onClick={addRow}>＋ Add Row</button>
-            <button type="submit">Save</button>
+            <button type="submit" disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save"}
+            </button>
             <button type="button" onClick={() => setShowModal(false)}>Close</button>
           </div>
         </form>

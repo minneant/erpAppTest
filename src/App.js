@@ -48,24 +48,32 @@ function App() {
     }
   };
 
-  const categorizeData = (data) => {
-    const isFoamingOrWire = (proc) => proc === "Foaming" || proc === "Wire";
-    const groupByItem = (items) => {
-      const result = {};
-      for (const row of items) {
-        const key = row.Item;
-        result[key] = (result[key] || 0) + parseInt(row.Amount);
-      }
-      return result;
-    };
-    const leftData = groupByItem(data.filter((row) => isFoamingOrWire(row.Process)));
-    const rightData = groupByItem(data.filter((row) => !isFoamingOrWire(row.Process)));
-    return { leftData, rightData };
+const categorizeData = (data) => {
+  const isFoamingOrWire = (proc) => proc === "Foaming" || proc === "Wire";
+  const groupByItem = (items) => {
+    const result = {};
+    for (const row of items) {
+      const key = row.Item;
+      result[key] = (result[key] || 0) + parseInt(row.Amount);
+    }
+    return result;
   };
+  const leftData = groupByItem(data.filter((row) => isFoamingOrWire(row.Process)));
+  const rightData = groupByItem(data.filter((row) => !isFoamingOrWire(row.Process)));
+  return { leftData, rightData };
+};
 
-  const { leftData, rightData } = categorizeData(productionData);
+  const formatDate = (d) => new Date(d).toLocaleDateString("sv-SE");
+  const selectedDateStr = formatDate(selectedDate);
 
-  const formatDate = (date) => date.toISOString().slice(0, 10);
+  // ✅ 선택된 날짜만 필터링
+  const filteredData = productionData.filter(
+    (row) => formatDate(new Date(row.Date)) === selectedDateStr
+  );
+
+  // ✅ 필터링된 데이터만 분류
+  const { leftData, rightData } = categorizeData(filteredData);
+
   const changeDateBy = (days) => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
@@ -96,7 +104,7 @@ function App() {
           </ul>
         </div>
         <div className="column">
-          <h2>Finishing</h2>
+          <h2>Finishing / Elbow</h2>
           <ul>
             {Object.entries(rightData).map(([item, count]) => (
               <li key={item}>
@@ -119,6 +127,7 @@ function App() {
           setShowModal={setShowModal}
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
+          onSaveSuccess={fetchProductionData}
         />
       )}
     </div>

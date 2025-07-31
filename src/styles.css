@@ -1,3 +1,5 @@
+/* styles.css */
+
 .app-layout {
   display: flex;
   flex-direction: column;
@@ -9,31 +11,54 @@
 .date-header {
   margin-bottom: 15px;
   display: flex;
-  justify-content: center; /* <-- 추가 */
+  justify-content: center;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .content-row {
   display: flex;
   flex: 1;
+  flex-wrap: wrap;
   gap: 20px;
-  /* 좌우 분리 공간 확보 */
+  margin-bottom: 60px;
 }
 
 .column {
-  flex: 1;
+  flex: 1 1 300px;
   background-color: #f5f5f5;
   padding: 15px;
   border-radius: 8px;
   box-shadow: 0 0 8px #ccc;
   overflow-y: auto;
+  max-height: 50vh;
+}
+
+.column h2 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.column .request-summary {
+  color: tomato;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.column ul {
+  padding-left: 20px;
+}
+
+.column ul li::marker {
+  color: black;
 }
 
 .add-btn {
   position: fixed;
-  bottom: 30px;
-  right: 30px;
+  bottom: 20px;
+  right: 20px;
   width: 50px;
   height: 50px;
   font-size: 28px;
