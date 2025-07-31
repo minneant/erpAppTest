@@ -69,3 +69,18 @@
   cursor: pointer;
   box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
+
+.text-tomato {
+  color: tomato;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+
+.text-lime {
+  color: limegreen;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: bold;
+}

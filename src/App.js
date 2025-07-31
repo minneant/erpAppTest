@@ -1,3 +1,4 @@
+// ✅ App.js with request vs actual color logic (fixed categorizeData order)
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./styles.css";
@@ -8,6 +9,7 @@ const WEB_APP_URL =
 
 function App() {
   const [productionData, setProductionData] = useState([]);
+  const [requestData, setRequestData] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [modalMode, setModalMode] = useState("Record");
@@ -18,6 +20,7 @@ function App() {
 
   useEffect(() => {
     fetchProductionData();
+    fetchRequestData();
     fetchDropdownOptions();
   }, []);
 
@@ -30,12 +33,19 @@ function App() {
     }
   };
 
+  const fetchRequestData = async () => {
+    try {
+      const res = await axios.get(`${WEB_APP_URL}?action=getProductionRequests`);
+      setRequestData(res.data);
+    } catch (error) {
+      console.error("Failed to load request data:", error);
+    }
+  };
+
   const fetchDropdownOptions = async () => {
     try {
       const res = await axios.get(`${WEB_APP_URL}?action=getMeta`);
       const rows = res.data;
-
-      // 구조: { Process: [{name, alias}], Type: [...], Line: [...] }
       const grouped = { Process: [], Type: [], Line: [] };
       rows.forEach((row) => {
         if (grouped[row.category] && !grouped[row.category].some(r => r.name === row.name)) {
@@ -48,8 +58,32 @@ function App() {
     }
   };
 
-const categorizeData = (data) => {
-  const isFoamingOrWire = (proc) => proc === "Foaming" || proc === "Wire";
+  const categorizeData = (data) => {
+    const isFoamingOrWire = (proc) => proc === "Foaming" || proc === "Wire";
+    const groupByItem = (items) => {
+      const result = {};
+      for (const row of items) {
+        const key = row.Item;
+        result[key] = (result[key] || 0) + parseInt(row.Amount);
+      }
+      return result;
+    };
+    const leftData = groupByItem(data.filter((row) => isFoamingOrWire(row.Process)));
+    const rightData = groupByItem(data.filter((row) => !isFoamingOrWire(row.Process)));
+    return { leftData, rightData };
+  };
+
+  const formatDate = (d) => new Date(d).toLocaleDateString("sv-SE");
+  const selectedDateStr = formatDate(selectedDate);
+
+  const filteredData = productionData.filter(
+    (row) => formatDate(row.Date) === selectedDateStr
+  );
+
+  const filteredRequests = requestData.filter(
+    (row) => formatDate(row.Date) === selectedDateStr
+  );
+
   const groupByItem = (items) => {
     const result = {};
     for (const row of items) {
@@ -58,21 +92,9 @@ const categorizeData = (data) => {
     }
     return result;
   };
-  const leftData = groupByItem(data.filter((row) => isFoamingOrWire(row.Process)));
-  const rightData = groupByItem(data.filter((row) => !isFoamingOrWire(row.Process)));
-  return { leftData, rightData };
-};
 
-  const formatDate = (d) => new Date(d).toLocaleDateString("sv-SE");
-  const selectedDateStr = formatDate(selectedDate);
-
-  // ✅ 선택된 날짜만 필터링
-  const filteredData = productionData.filter(
-    (row) => formatDate(new Date(row.Date)) === selectedDateStr
-  );
-
-  // ✅ 필터링된 데이터만 분류
   const { leftData, rightData } = categorizeData(filteredData);
+  const requestDataByItem = groupByItem(filteredRequests);
 
   const changeDateBy = (days) => {
     const newDate = new Date(selectedDate);
@@ -86,7 +108,7 @@ const categorizeData = (data) => {
         <button onClick={() => changeDateBy(-1)}>&lt;</button>
         <input
           type="date"
-          value={formatDate(selectedDate)}
+          value={selectedDateStr}
           onChange={(e) => setSelectedDate(new Date(e.target.value))}
         />
         <button onClick={() => changeDateBy(1)}>&gt;</button>
@@ -96,6 +118,19 @@ const categorizeData = (data) => {
         <div className="column">
           <h2>Foaming / Wire</h2>
           <ul>
+            {Object.entries(requestDataByItem).map(([item, count]) => (
+              (item.includes("Foam") || item.includes("Wire")) && (
+                <li
+                  key={`request-${item}`}
+                  className={leftData[item] >= count ? "text-lime" : "text-tomato"}
+                >
+                  <strong>{item}</strong>: {count}
+                </li>
+              )
+            ))}
+          </ul>
+          <hr style={{ border: "none", borderTop: "1px solid #ccc", margin: "6px 0" }} />
+          <ul>
             {Object.entries(leftData).map(([item, count]) => (
               <li key={item}>
                 <strong>{item}</strong>: {count}
@@ -103,8 +138,22 @@ const categorizeData = (data) => {
             ))}
           </ul>
         </div>
+
         <div className="column">
           <h2>Finishing / Elbow</h2>
+          <ul>
+            {Object.entries(requestDataByItem).map(([item, count]) => (
+              (item.includes("Finish") || item.includes("Elbow")) && (
+                <li
+                  key={`request-${item}`}
+                  className={rightData[item] >= count ? "text-lime" : "text-tomato"}
+                >
+                  <strong>{item}</strong>: {count}
+                </li>
+              )
+            ))}
+          </ul>
+          <hr style={{ border: "none", borderTop: "1px solid #ccc", margin: "6px 0" }} />
           <ul>
             {Object.entries(rightData).map(([item, count]) => (
               <li key={item}>
@@ -127,7 +176,10 @@ const categorizeData = (data) => {
           setShowModal={setShowModal}
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
-          onSaveSuccess={fetchProductionData}
+          onSaveSuccess={() => {
+            fetchProductionData();
+            fetchRequestData();
+          }}
         />
       )}
     </div>
