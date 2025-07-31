@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./styles.css";
 import InputModal from "./components/InputModal";
+import EditModal from "./components/EditModal";
 import namingRuleImg from "./assets/itemnamingrule.png";
 
 const WEB_APP_URL =
@@ -11,6 +12,10 @@ function App() {
   const [productionData, setProductionData] = useState([]);
   const [requestData, setRequestData] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editType, setEditType] = useState(null); // "Record" or "Request"
+  const [editGroup, setEditGroup] = useState(null); // "Left" or "Right"
+  const [editRows, setEditRows] = useState([]);
   const [showNamingRule, setShowNamingRule] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [modalMode, setModalMode] = useState("Record");
@@ -77,24 +82,24 @@ function App() {
   const actualDataByItem = groupByItem(filteredData);
   const requestDataByItem = groupByItem(filteredRequests);
 
-  // processGroups: { "Foaming": "Left", "Foam": "Left", ... }
   const processGroups = dropdownOptions.Process.reduce((map, p) => {
     map[p.name] = p.group;
     map[p.alias] = p.group;
     return map;
   }, {});
 
-  const leftData = {}, rightData = {};
-
-  for (const [item, amount] of Object.entries(actualDataByItem)) {
-    const process = item.split("_").slice(-1)[0]; // ex: Foam
-    const group = processGroups[process] || "Right";
-    if (group === "Left") {
-      leftData[item] = amount;
-    } else {
-      rightData[item] = amount;
+  const splitByGroup = (data) => {
+    const left = [], right = [];
+    for (const row of data) {
+      const process = row.Item?.split("_").slice(-1)[0];
+      const group = processGroups[process] || "Right";
+      (group === "Left" ? left : right).push(row);
     }
-  }
+    return { left, right };
+  };
+
+  const { left: leftRecords, right: rightRecords } = splitByGroup(filteredData);
+  const { left: leftRequests, right: rightRequests } = splitByGroup(filteredRequests);
 
   const changeDateBy = (days) => {
     const newDate = new Date(selectedDate);
@@ -108,30 +113,26 @@ function App() {
     return `(Remainder: ${-diff})`;
   };
 
-  const renderRequestList = (dataByItem, groupLabel) => {
-    return Object.entries(requestDataByItem).map(([item, count]) => {
-      const process = item.split("_").slice(-1)[0];
-      const group = processGroups[process] || "Right";
-      if (group !== groupLabel) return null;
-      const actual = actualDataByItem[item] || 0;
-      return (
-        <li
-          key={`request-${item}`}
-          className={actual >= count ? "text-lime" : "text-tomato"}
-        >
-          <strong>{item}</strong>: {count} {formatRemainderText(actual, count)}
-        </li>
-      );
-    });
-  };
+  const openEditModal = (type, group) => {
+    const rows =
+      type === "Record"
+        ? (group === "Left" ? leftRecords : rightRecords)
+        : (group === "Left" ? leftRequests : rightRequests);
 
-  const renderActualList = (data) => (
-    Object.entries(data).map(([item, count]) => (
-      <li key={`actual-${item}`}>
-        <strong>{item}</strong>: {count}
-      </li>
-    ))
-  );
+    const editFormatted = rows.map(r => ({
+      process: r.Process,
+      type: r.Type,
+      line: r.Line,
+      inch: r.Inch,
+      amount: r.Amount,
+      date: formatDate(r.Date)
+    }));
+
+    setEditType(type);
+    setEditGroup(group);
+    setEditRows(editFormatted);
+    setShowEditModal(true);
+  };
 
   return (
     <div className="app-layout">
@@ -158,15 +159,52 @@ function App() {
       <div className="content-row">
         <div className="column">
           <h2>Foaming / Wire</h2>
-          <ul>{renderRequestList(requestDataByItem, "Left")}</ul>
-          <hr style={{ border: "none", borderTop: "1px solid #ccc", margin: "6px 0" }} />
-          <ul>{renderActualList(leftData)}</ul>
+          <ul onClick={() => openEditModal("Request", "Left")}>
+            {Object.entries(requestDataByItem).map(([item, count]) => {
+              const proc = item.split("_").slice(-1)[0];
+              const group = processGroups[proc] || "Right";
+              if (group !== "Left") return null;
+              const actual = actualDataByItem[item] || 0;
+              return (
+                <li key={item} className={actual >= count ? "text-lime" : "text-tomato"}>
+                  <strong>{item}</strong>: {count} {formatRemainderText(actual, count)}
+                </li>
+              );
+            })}
+          </ul>
+          <hr />
+          <ul onClick={() => openEditModal("Record", "Left")}>
+            {leftRecords.map(row => (
+              <li key={row.Item}>
+                <strong>{row.Item}</strong>: {row.Amount}
+              </li>
+            ))}
+          </ul>
         </div>
+
         <div className="column">
           <h2>Finishing / Elbow</h2>
-          <ul>{renderRequestList(requestDataByItem, "Right")}</ul>
-          <hr style={{ border: "none", borderTop: "1px solid #ccc", margin: "6px 0" }} />
-          <ul>{renderActualList(rightData)}</ul>
+          <ul onClick={() => openEditModal("Request", "Right")}>
+            {Object.entries(requestDataByItem).map(([item, count]) => {
+              const proc = item.split("_").slice(-1)[0];
+              const group = processGroups[proc] || "Right";
+              if (group !== "Right") return null;
+              const actual = actualDataByItem[item] || 0;
+              return (
+                <li key={item} className={actual >= count ? "text-lime" : "text-tomato"}>
+                  <strong>{item}</strong>: {count} {formatRemainderText(actual, count)}
+                </li>
+              );
+            })}
+          </ul>
+          <hr />
+          <ul onClick={() => openEditModal("Record", "Right")}>
+            {rightRecords.map(row => (
+              <li key={row.Item}>
+                <strong>{row.Item}</strong>: {row.Amount}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
@@ -182,6 +220,20 @@ function App() {
           setShowModal={setShowModal}
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
+          onSaveSuccess={() => {
+            fetchProductionData();
+            fetchRequestData();
+          }}
+        />
+      )}
+
+      {showEditModal && (
+        <EditModal
+          initialRows={editRows}
+          type={editType}
+          group={editGroup}
+          setShowModal={setShowEditModal}
+          selectedDate={selectedDate}
           onSaveSuccess={() => {
             fetchProductionData();
             fetchRequestData();
